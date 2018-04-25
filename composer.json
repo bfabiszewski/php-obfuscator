@@ -3,7 +3,7 @@
     "description":        "A basic but functional PHP obfuscator for object oriented PHP",
     "license":            "MIT",
     "minimum-stability":  "dev",
-
+    "prefer-stable": true,
     "bin": [
         "bin/obfuscate"
     ],
@@ -22,11 +22,11 @@
     ],
 
     "require": {
-        "nikic/php-parser":              "~3@dev",
-        "symfony/console":               "~2.5",
-        "symfony/dependency-injection":  "~2.5",
-        "symfony/config":                "~2.5",
-        "symfony/yaml":                  "~2.5",
-        "symfony/event-dispatcher":      "~2.5"
+        "nikic/php-parser":              "^3.1",
+        "symfony/console":               "^2.5",
+        "symfony/dependency-injection":  "^2.5",
+        "symfony/config":                "^2.5",
+        "symfony/yaml":                  "^2.5",
+        "symfony/event-dispatcher":      "^2.5"
     }
 }
