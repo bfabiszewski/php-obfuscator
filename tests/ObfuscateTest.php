@@ -1,32 +1,44 @@
 <?php
 
-namespace Tests;
+class ObfuscateTest extends Base
+{
 
-class ObfuscateTest extends Base {
+    public const AFTER = "/after";
+    public const BEFORE = "/before";
+    public const EXPECTED = "/expected";
 
-    const AFTER_PATH    = "/after";
-    const BEFORE_PATH   = "/before";
-    const EXPECTED_PATH = "/expected";
+    public function testObfuscate(): void
+    {
+        $beforePath = __DIR__ . self::BEFORE;
+        $afterPath = __DIR__ . self::AFTER;
+        $expectedPath = __DIR__ . self::EXPECTED;
+        $configPath = __DIR__ . "/config.yml";
 
-    protected function tearDown() {
-        $files = glob(__DIR__ . self::AFTER_PATH . "/*");
+        shell_exec("cd {$beforePath}; ../../bin/obfuscate obfuscate . {$afterPath} --config={$configPath}");
+        $expectedFileNames = scandir($expectedPath);
+        foreach ($expectedFileNames as $fileName) {
+            if ($fileName === '.' || $fileName === '..') {
+                continue;
+            }
+
+            $afterFile = "{$afterPath}/{$fileName}";
+            $expectedFile = "{$expectedPath}/{$fileName}";
+
+            if (!file_exists($afterFile)) {
+                self::fail("{$afterPath}/{$fileName} not found");
+            }
+            self::assertFileEquals($expectedFile, $afterFile);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        $afterPath = __DIR__ . self::AFTER;
+
+        $files = glob($afterPath . "/*");
         foreach ($files as $file) {
             unlink($file);
         }
-        rmdir(__DIR__ . self::AFTER_PATH);
-    }
-
-    public function testObfuscate() {
-        shell_exec("./bin/obfuscate obfuscate " . __DIR__ . self::BEFORE_PATH . " " . __DIR__ . self::AFTER_PATH . " --config=" . __DIR__ . "/config.yml");
-        $expectedFileNames = scandir(__DIR__ . self::EXPECTED_PATH);
-        foreach ($expectedFileNames as $expectedFileName) {
-            if ($expectedFileName === '.' || $expectedFileName === '..') {
-                continue;
-            }
-            if (!file_exists(__DIR__ . self::AFTER_PATH . "/" . $expectedFileName)) {
-                $this->fail("{$expectedFileName} not found");
-            }
-            $this->assertEquals(file_get_contents(__DIR__ . self::EXPECTED_PATH . "/" . $expectedFileName), file_get_contents(__DIR__ . self::AFTER_PATH . "/" . $expectedFileName));
-        }
+        rmdir($afterPath);
     }
 }

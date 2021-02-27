@@ -8,6 +8,7 @@
 
 namespace Naneau\Obfuscator;
 
+use Exception;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 use Symfony\Component\Config\FileLocator;
@@ -29,13 +30,14 @@ class Container
      *
      * @var ContainerBuilder
      */
-    private $container;
+    private ContainerBuilder $container;
 
     /**
      * Constructor
      *
      * @return void
-     **/
+     **@throws Exception
+     */
     public function __construct()
     {
         $this->setContainer(new ContainerBuilder());
@@ -48,8 +50,10 @@ class Container
      *
      * @param string $file
      * @return Container
-     **/
-    public function loadFile($file)
+     *
+     * @throws Exception
+     */
+    public function loadFile(string $file): Container
     {
         $loader = new YamlFileLoader(
             $this->getContainer(),
@@ -65,7 +69,7 @@ class Container
      *
      * @return ContainerBuilder
      */
-    public function getContainer()
+    public function getContainer(): ContainerBuilder
     {
         return $this->container;
     }
@@ -76,7 +80,7 @@ class Container
      * @param ContainerBuilder $container
      * @return Container
      */
-    public function setContainer(ContainerBuilder $container)
+    public function setContainer(ContainerBuilder $container): Container
     {
         $this->container = $container;
 

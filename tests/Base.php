@@ -1,7 +1,7 @@
 <?php
 
-namespace Tests;
+use PHPUnit\Framework\TestCase;
 
-class Base extends \PHPUnit_Framework_TestCase {
+class Base extends TestCase {
     
 }

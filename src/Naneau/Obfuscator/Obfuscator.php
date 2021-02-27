@@ -14,15 +14,14 @@ use Naneau\Obfuscator\Obfuscator\Event\FileError as FileErrorEvent;
 use PhpParser\NodeTraverserInterface as NodeTraverser;
 
 use PhpParser\Parser;
-use PhpParser\Lexer;
 use PhpParser\PrettyPrinter\Standard as PrettyPrinter;
 
+use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 use \RegexIterator;
 use \RecursiveDirectoryIterator;
 use \RecursiveIteratorIterator;
-use \SplFileInfo;
 
 use \Exception;
 
@@ -42,55 +41,55 @@ class Obfuscator
      *
      * @var Parser
      */
-    private $parser;
+    private Parser $parser;
 
     /**
      * the node traverser
      *
      * @var NodeTraverser
      */
-    private $traverser;
+    private NodeTraverser $traverser;
 
     /**
      * the "pretty" printer
      *
      * @var PrettyPrinter
      */
-    private $prettyPrinter;
+    private PrettyPrinter $prettyPrinter;
 
     /**
      * the event dispatcher
      *
      * @var EventDispatcher
      */
-    private $eventDispatcher;
+    private EventDispatcher $eventDispatcher;
 
     /**
      * The file regex
      *
      * @var string
      **/
-    private $fileRegex = '/\.php$/';
+    private string $fileRegex = '/\.php$/';
 
     /**
      * Strip whitespace
      *
-     * @param  string $directory
-     * @param  bool   $stripWhitespace
+     * @param string $directory
+     * @param bool $stripWhitespace
+     * @param bool $ignoreError
      * @return void
-     **/
-    public function obfuscate($directory, $stripWhitespace = false,
-        $ignoreError = false)
+     * @throws Exception
+     */
+    public function obfuscate(string $directory, bool $stripWhitespace = false, bool $ignoreError = false): void
     {
         foreach ($this->getFiles($directory) as $file) {
             $this->getEventDispatcher()->dispatch(
-                'obfuscator.file',
-                new FileEvent($file)
+                new FileEvent($file),
+                'obfuscator.file'
             );
 
             // Write obfuscated source
-            file_put_contents($file, $this->obfuscateFileContents($file,
-                $ignoreError));
+            file_put_contents($file, $this->obfuscateFileContents($file, $ignoreError));
 
             // Strip whitespace if required
             if ($stripWhitespace) {
@@ -100,126 +99,12 @@ class Obfuscator
     }
 
     /**
-     * Get the parser
-     *
-     * @return Parser
-     */
-    public function getParser()
-    {
-        return $this->parser;
-    }
-
-    /**
-     * Set the parser
-     *
-     * @param  Parser     $parser
-     * @return Obfuscator
-     */
-    public function setParser(Parser $parser)
-    {
-        $this->parser = $parser;
-
-        return $this;
-    }
-
-    /**
-     * Get the node traverser
-     *
-     * @return NodeTraverser
-     */
-    public function getTraverser()
-    {
-        return $this->traverser;
-    }
-
-    /**
-     * Set the node traverser
-     *
-     * @param  NodeTraverser $traverser
-     * @return Obfuscator
-     */
-    public function setTraverser(NodeTraverser $traverser)
-    {
-        $this->traverser = $traverser;
-
-        return $this;
-    }
-
-    /**
-     * Get the "pretty" printer
-     *
-     * @return PrettyPrinter
-     */
-    public function getPrettyPrinter()
-    {
-        return $this->prettyPrinter;
-    }
-
-    /**
-     * Set the "pretty" printer
-     *
-     * @param  PrettyPrinter $prettyPrinter
-     * @return Obfuscator
-     */
-    public function setPrettyPrinter(PrettyPrinter $prettyPrinter)
-    {
-        $this->prettyPrinter = $prettyPrinter;
-
-        return $this;
-    }
-
-    /**
-     * Get the event dispatcher
-     *
-     * @return EventDispatcher
-     */
-    public function getEventDispatcher()
-    {
-        return $this->eventDispatcher;
-    }
-
-    /**
-     * Set the event dispatcher
-     *
-     * @param EventDispatcher $eventDispatcher
-     * @return Obfuscator
-     */
-    public function setEventDispatcher(EventDispatcher $eventDispatcher)
-    {
-        $this->eventDispatcher = $eventDispatcher;
-
-        return $this;
-    }
-
-    /**
-     * Get the regex for file inclusion
-     *
-     * @return string
-     */
-    public function getFileRegex()
-    {
-        return $this->fileRegex;
-    }
-
-    /**
-     * Set the regex for file inclusion
-     *
-     * @param string $fileRegex
-     * @return Obfuscator
-     */
-    public function setFileRegex($fileRegex)
-    {
-        $this->fileRegex = $fileRegex;
-
-        return $this;
-    }
-
-    /**
      * Get the file list
      *
-     * @return SplFileInfo
-     **/
-    private function getFiles($directory)
+     * @param string $directory
+     * @return RegexIterator
+     */
+    private function getFiles(string $directory): RegexIterator
     {
         return new RegexIterator(
             new RecursiveIteratorIterator(
@@ -230,14 +115,61 @@ class Obfuscator
     }
 
     /**
+     * Get the regex for file inclusion
+     *
+     * @return string
+     */
+    public function getFileRegex(): string
+    {
+        return $this->fileRegex;
+    }
+
+    /**
+     * Set the regex for file inclusion
+     *
+     * @param string $fileRegex
+     * @return Obfuscator
+     */
+    public function setFileRegex(string $fileRegex): Obfuscator
+    {
+        $this->fileRegex = $fileRegex;
+
+        return $this;
+    }
+
+    /**
+     * Get the event dispatcher
+     *
+     * @return EventDispatcher
+     */
+    public function getEventDispatcher(): EventDispatcher
+    {
+        return $this->eventDispatcher;
+    }
+
+    /**
+     * Set the event dispatcher
+     *
+     * @param EventDispatcher $eventDispatcher
+     * @return Obfuscator
+     */
+    public function setEventDispatcher(EventDispatcher $eventDispatcher): Obfuscator
+    {
+        $this->eventDispatcher = $eventDispatcher;
+
+        return $this;
+    }
+
+    /**
      * Obfuscate a single file's contents
      *
-     * @param  string $file
-     * @param  boolean $ignoreError if true, do not throw an Error and 
+     * @param string $file
+     * @param boolean $ignoreError if true, do not throw an Error and
      *                              exit, but continue with next file
      * @return string obfuscated contents
-     **/
-    private function obfuscateFileContents($file, $ignoreError)
+     * @throws Exception
+     */
+    private function obfuscateFileContents(string $file, bool $ignoreError): string
     {
         try {
             // Input code
@@ -250,19 +182,88 @@ class Obfuscator
 
             return "<?php\n" . $this->getPrettyPrinter()->prettyPrint($ast);
         } catch (Exception $e) {
-            if($ignoreError) {
-                sprintf('Could not parse file "%s"', $file);
+            if ($ignoreError) {
                 $this->getEventDispatcher()->dispatch(
-                    'obfuscator.file.error',
-                    new FileErrorEvent($file, $e->getMessage())
+                    new FileErrorEvent($file, $e->getMessage()),
+                    'obfuscator.file.error'
                 );
             } else {
-                throw new Exception(
+                throw new RuntimeException(
                     sprintf('Could not parse file "%s"', $file),
                     null,
                     $e
                 );
             }
         }
+        return '';
+    }
+
+    /**
+     * Get the node traverser
+     *
+     * @return NodeTraverser
+     */
+    public function getTraverser(): NodeTraverser
+    {
+        return $this->traverser;
+    }
+
+    /**
+     * Set the node traverser
+     *
+     * @param NodeTraverser $traverser
+     * @return Obfuscator
+     */
+    public function setTraverser(NodeTraverser $traverser): Obfuscator
+    {
+        $this->traverser = $traverser;
+
+        return $this;
+    }
+
+    /**
+     * Get the parser
+     *
+     * @return Parser
+     */
+    public function getParser(): Parser
+    {
+        return $this->parser;
+    }
+
+    /**
+     * Set the parser
+     *
+     * @param Parser $parser
+     * @return Obfuscator
+     */
+    public function setParser(Parser $parser): Obfuscator
+    {
+        $this->parser = $parser;
+
+        return $this;
+    }
+
+    /**
+     * Get the "pretty" printer
+     *
+     * @return PrettyPrinter
+     */
+    public function getPrettyPrinter(): PrettyPrinter
+    {
+        return $this->prettyPrinter;
+    }
+
+    /**
+     * Set the "pretty" printer
+     *
+     * @param PrettyPrinter $prettyPrinter
+     * @return Obfuscator
+     */
+    public function setPrettyPrinter(PrettyPrinter $prettyPrinter): Obfuscator
+    {
+        $this->prettyPrinter = $prettyPrinter;
+
+        return $this;
     }
 }

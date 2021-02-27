@@ -31,19 +31,19 @@ abstract class Scrambler extends NodeVisitorAbstract
      *
      * @var StringScrambler
      **/
-    private $scrambler;
+    private StringScrambler $scrambler;
 
     /**
      * Variables to ignore
      *
      * @var string[]
      **/
-    private $ignore = array();
+    private array $ignore = [];
 
     /**
      * Constructor
      *
-     * @param  StringScrambler $scrambler
+     * @param StringScrambler $scrambler
      * @return void
      **/
     public function __construct(StringScrambler $scrambler)
@@ -52,28 +52,44 @@ abstract class Scrambler extends NodeVisitorAbstract
     }
 
     /**
+     * Add a variable name to ignore
+     *
+     * @param string|string[] $ignore
+     * @return Scrambler
+     **/
+    public function addIgnore($ignore): Scrambler
+    {
+        if (is_string($ignore)) {
+            $this->ignore = array_merge($this->ignore, array($ignore));
+        } else if (is_array($ignore)) {
+            $this->ignore = array_merge($this->ignore, $ignore);
+        } else {
+            throw new InvalidArgumentException('Invalid ignore type passed');
+        }
+        return $this;
+    }
+
+    /**
      * Scramble a property of a node
      *
-     * @param  Node   $node
-     * @param  string $var  property to scramble
+     * @param Node $node
      * @return Node
      **/
-    protected function scramble(Node $node, $var = 'name')
+    protected function scramble(Node $node): ?Node
     {
         // String/value to scramble
-        $toScramble = $node->$var;
-
-        // We ignore to scramble if it's not string (ex: a variable variable name)
-        if (!is_string($toScramble)) {
-            return;
+        if ($node->name instanceof Node\Identifier) {
+            $toScramble = $node->name->toString();
+        } else if (is_string($node->name)) {
+            $toScramble = $node->name;
+        } else {
+            // We ignore to scramble if it's not string (ex: a variable variable name)
+            return null;
         }
 
         // Make sure there's something to scramble
-        if (strlen($toScramble) === 0) {
-            throw new InvalidArgumentException(sprintf(
-                '"%s" value empty for node, can not scramble',
-                $var
-            ));
+        if ($toScramble === '') {
+            throw new InvalidArgumentException('Value empty for node, can not scramble');
         }
 
         // Should we ignore it?
@@ -81,20 +97,48 @@ abstract class Scrambler extends NodeVisitorAbstract
             return $node;
         }
 
-        // Prefix with 'p' so we dont' start with an number
-        $node->$var = $this->scrambleString($toScramble);
+        $scrambled = $this->scrambleString($toScramble);
+
+        if ($node->name instanceof Node\Identifier) {
+            $node->name->name = $scrambled;
+        } else {
+            $node->name = $scrambled;
+        }
 
         // Return the node
         return $node;
     }
 
     /**
+     * Get variables to ignore
+     *
+     * @return string[]
+     */
+    public function getIgnore(): array
+    {
+        return $this->ignore;
+    }
+
+    /**
+     * Set variables to ignore
+     *
+     * @param string[] $ignore
+     * @return Scrambler
+     */
+    public function setIgnore(array $ignore): Scrambler
+    {
+        $this->ignore = $ignore;
+
+        return $this;
+    }
+
+    /**
      * Scramble a string
      *
-     * @param  string $string
+     * @param string $string
      * @return string
-     **/
-    protected function scrambleString($string)
+     */
+    protected function scrambleString(string $string): string
     {
         return 's' . $this->getScrambler()->scramble($string);
     }
@@ -104,7 +148,7 @@ abstract class Scrambler extends NodeVisitorAbstract
      *
      * @return StringScrambler
      */
-    public function getScrambler()
+    public function getScrambler(): StringScrambler
     {
         return $this->scrambler;
     }
@@ -112,54 +156,13 @@ abstract class Scrambler extends NodeVisitorAbstract
     /**
      * Set the string scrambler
      *
-     * @param  StringScrambler $scrambler
-     * @return RenameParameter
+     * @param StringScrambler $scrambler
+     * @return Scrambler
      */
-    public function setScrambler(StringScrambler $scrambler)
+    public function setScrambler(StringScrambler $scrambler): Scrambler
     {
         $this->scrambler = $scrambler;
 
-        return $this;
-    }
-
-    /**
-     * Get variables to ignore
-     *
-     * @return string[]
-     */
-    public function getIgnore()
-    {
-        return $this->ignore;
-    }
-
-    /**
-     * Set variables to ignore
-     *
-     * @param  string[] $ignore
-     * @return parent
-     */
-    public function setIgnore(array $ignore)
-    {
-        $this->ignore = $ignore;
-
-        return $this;
-    }
-
-    /**
-     * Add a variable name to ignore
-     *
-     * @param  string|string[]        $ignore
-     * @return RenameParameterVisitor
-     **/
-    public function addIgnore($ignore)
-    {
-        if (is_string($ignore)) {
-            $this->ignore = array_merge($this->ignore, array($ignore));
-        } else if (is_array($ignore)) {
-            $this->ignore = array_merge($this->ignore, $ignore);
-        } else {
-            throw new InvalidArgumentException('Invalid ignore type passed');
-        }
         return $this;
     }
 }

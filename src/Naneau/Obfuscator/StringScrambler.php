@@ -25,32 +25,33 @@ class StringScrambler
      *
      * @return void
      **/
-    private $salt;
+    private string $salt;
 
     /**
      * Constructor
      *
-     * @param  string $salt optional salt, when left empty (null) semi-random value will be generated
+     * @param string $salt optional salt, when left empty (null) semi-random value will be generated
      * @return void
      **/
     public function __construct($salt = null)
     {
         if ($salt === null) {
+            /** @noinspection RandomApiMigrationInspection */
             $this->setSalt(
-                md5(microtime(true) . rand(0,1))
+                md5(microtime(true) . rand(0, 1))
             );
-        } else { 
-            $this->setSalt($salt); 
+        } else {
+            $this->setSalt($salt);
         }
     }
 
     /**
      * Scramble a string
      *
-     * @param  string $string
+     * @param string $string
      * @return string
-     **/
-    public function scramble($string)
+     */
+    public function scramble(string $string): string
     {
         return 'p' . substr(md5($string . $this->getSalt()), 0, 6);
     }
@@ -60,7 +61,7 @@ class StringScrambler
      *
      * @return string
      */
-    public function getSalt()
+    public function getSalt(): string
     {
         return $this->salt;
     }
@@ -68,10 +69,10 @@ class StringScrambler
     /**
      * Set the salt
      *
-     * @param  string          $salt
+     * @param string $salt
      * @return StringScrambler
      */
-    public function setSalt($salt)
+    public function setSalt(string $salt): StringScrambler
     {
         $this->salt = $salt;
 

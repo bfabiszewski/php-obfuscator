@@ -8,7 +8,7 @@
 
 namespace Naneau\Obfuscator\Obfuscator\Event;
 
-use Symfony\Component\EventDispatcher\Event;
+use Symfony\Component\EventDispatcher\GenericEvent;
 
 /**
  * File
@@ -19,23 +19,23 @@ use Symfony\Component\EventDispatcher\Event;
  * @package         Obfuscator
  * @subpackage      Obfuscator
  */
-class File extends Event
+class File extends GenericEvent
 {
     /**
      * The file
      *
      * @var string
      **/
-    private $file;
+    private string $file;
 
     /**
      * Constructor
      *
      * @param string $file
-     * @return void
-     **/
-    public function __construct($file)
+     */
+    public function __construct(string $file)
     {
+        parent::__construct();
         $this->setFile($file);
     }
 
@@ -44,7 +44,7 @@ class File extends Event
      *
      * @return string
      */
-    public function getFile()
+    public function getFile(): string
     {
         return $this->file;
     }
@@ -53,9 +53,9 @@ class File extends Event
      * Set the file
      *
      * @param string $file
-     * @return parent
+     * @return File
      */
-    public function setFile($file)
+    public function setFile(string $file): File
     {
         $this->file = $file;
 

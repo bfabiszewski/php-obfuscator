@@ -24,15 +24,15 @@ trait SkipTrait
      *
      * @var bool
      **/
-    private $skip = false;
+    private bool $skip = false;
 
     /**
      * Should we skip processing?
      *
-     * @param  bool                  $skip
-     * @return ScramblePrivateMethod
+     * @param bool $skip
+     * @return SkipTrait
      **/
-    protected function skip($skip = false)
+    protected function skip(bool $skip = false): self
     {
         $this->skip = $skip;
 
@@ -44,7 +44,7 @@ trait SkipTrait
      *
      * @return bool
      **/
-    protected function shouldSkip()
+    protected function shouldSkip(): bool
     {
         return $this->skip;
     }

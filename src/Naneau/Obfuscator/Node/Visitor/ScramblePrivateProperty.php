@@ -9,11 +9,7 @@
 
 namespace Naneau\Obfuscator\Node\Visitor;
 
-use Naneau\Obfuscator\Node\Visitor\TrackingRenamerTrait;
-use Naneau\Obfuscator\Node\Visitor\SkipTrait;
-
 use Naneau\Obfuscator\Node\Visitor\Scrambler as ScramblerVisitor;
-use Naneau\Obfuscator\StringScrambler;
 
 use PhpParser\Node;
 
@@ -21,8 +17,6 @@ use PhpParser\Node\Stmt\Class_ as ClassNode;
 use PhpParser\Node\Stmt\Property;
 
 use PhpParser\Node\Expr\PropertyFetch;
-
-use PhpParser\Node\Expr\Variable;
 
 /**
  * ScramblePrivateProperty
@@ -43,23 +37,12 @@ class ScramblePrivateProperty extends ScramblerVisitor
     use SkipTrait;
 
     /**
-     * Constructor
-     *
-     * @param  StringScrambler $scrambler
-     * @return void
-     **/
-    public function __construct(StringScrambler $scrambler)
-    {
-        parent::__construct($scrambler);
-    }
-
-    /**
      * Before node traversal
      *
-     * @param  Node[] $nodes
-     * @return array
+     * @param Node[] $nodes
+     * @return Node[]
      **/
-    public function beforeTraverse(array $nodes)
+    public function beforeTraverse(array $nodes): array
     {
         $this
             ->resetRenamed()
@@ -69,52 +52,20 @@ class ScramblePrivateProperty extends ScramblerVisitor
     }
 
     /**
-     * Check all variable nodes
-     *
-     * @param  Node $node
-     * @return void
-     **/
-    public function enterNode(Node $node)
-    {
-        if ($node instanceof PropertyFetch) {
-
-            if (!is_string($node->name) || $node->var->name !== "this") {
-                return;
-            }
-
-            if ($this->isRenamed($node->name)) {
-                $node->name = $this->getNewName($node->name);
-                return $node;
-            }
-        }
-
-        if ($node instanceof Node\Expr\StaticPropertyFetch) {
-            if ((string)$node->class !== "self") {
-                return;
-            }
-
-            if ($this->isRenamed($node->name)) {
-                $node->name = $this->getNewName($node->name);
-                return $node;
-            }
-        }
-    }
-
-    /**
      * Recursively scan for private method definitions and rename them
      *
-     * @param  Node[] $nodes
+     * @param Node[] $nodes
      * @return void
      **/
-    private function scanPropertyDefinitions(array $nodes)
+    private function scanPropertyDefinitions(array $nodes): void
     {
         foreach ($nodes as $node) {
             // Scramble the private method definitions
-            if ($node instanceof Property && ($node->type & ClassNode::MODIFIER_PRIVATE)) {
-                foreach($node->props as $property) {
+            if ($node instanceof Property && ($node->flags & ClassNode::MODIFIER_PRIVATE)) {
+                foreach ($node->props as $property) {
 
                     // Record original name and scramble it
-                    $originalName = $property->name;
+                    $originalName = $property->name->toString();
                     $this->scramble($property);
 
                     // Record renaming
@@ -128,5 +79,39 @@ class ScramblePrivateProperty extends ScramblerVisitor
                 $this->scanPropertyDefinitions($node->stmts);
             }
         }
+    }
+
+    /**
+     * Check all variable nodes
+     *
+     * @param Node $node
+     * @return Node|null
+     */
+    public function enterNode(Node $node): ?Node
+    {
+        if ($node instanceof PropertyFetch) {
+
+            if (!(is_string($node->name) || $node->name instanceof Node\Identifier) || $node->var->name !== "this") {
+                return null;
+            }
+
+            if ($this->isRenamed($node->name)) {
+                $node->name = $this->getNewName($node->name);
+                return $node;
+            }
+        }
+
+        if ($node instanceof Node\Expr\StaticPropertyFetch) {
+            if ($node->class->toString() !== "self") {
+                return null;
+            }
+
+            if ($this->isRenamed($node->name)) {
+                $node->name = $this->getNewName($node->name);
+                return $node;
+            }
+        }
+
+        return null;
     }
 }

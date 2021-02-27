@@ -9,11 +9,7 @@
 
 namespace Naneau\Obfuscator\Node\Visitor;
 
-use Naneau\Obfuscator\Node\Visitor\TrackingRenamerTrait;
-use Naneau\Obfuscator\Node\Visitor\SkipTrait;
-
 use Naneau\Obfuscator\Node\Visitor\Scrambler as ScramblerVisitor;
-use Naneau\Obfuscator\StringScrambler;
 
 use PhpParser\Node;
 
@@ -46,12 +42,19 @@ class ScramblePrivateMethod extends ScramblerVisitor
     use SkipTrait;
 
     /**
+     * Active class
+     *
+     * @var ClassNode|bool
+     **/
+    private $currentClassNode;
+
+    /**
      * Before node traversal
      *
-     * @param  Node[] $nodes
+     * @param Node[] $nodes
      * @return array
      **/
-    public function beforeTraverse(array $nodes)
+    public function beforeTraverse(array $nodes): array
     {
         $this
             ->resetRenamed()
@@ -65,36 +68,12 @@ class ScramblePrivateMethod extends ScramblerVisitor
     }
 
     /**
-     * Check all variable nodes
-     *
-     * @param  Node $node
-     * @return void
-     **/
-    public function enterNode(Node $node)
-    {
-        if ($this->shouldSkip()) {
-            return;
-        }
-
-        // Scramble calls
-        if (($node instanceof MethodCall && $node->var->name === 'this') || ($node instanceof StaticCall && $node->class instanceof Node\Name && $node->class->toString() === 'self')) {
-            // Node wasn't renamed
-            if (!$this->isRenamed($node->name)) {
-                return;
-            }
-
-            // Scramble usage
-            return $this->scramble($node);
-        }
-    }
-
-    /**
      * Recursively scan for method calls and see if variables are used
      *
-     * @param  Node[] $nodes
-     * @return void
+     * @param Node[] $nodes
+     * @return bool
      **/
-    private function variableMethodCallsUsed(array $nodes)
+    private function variableMethodCallsUsed(array $nodes): bool
     {
         foreach ($nodes as $node) {
             if ($node instanceof MethodCall && $node->name instanceof Variable && $node->var->name === "this") {
@@ -118,17 +97,17 @@ class ScramblePrivateMethod extends ScramblerVisitor
     /**
      * Recursively scan for private method definitions and rename them
      *
-     * @param  Node[] $nodes
+     * @param Node[] $nodes
      * @return void
      **/
-    private function scanMethodDefinitions(array $nodes)
+    private function scanMethodDefinitions(array $nodes): void
     {
         foreach ($nodes as $node) {
             // Scramble the private method definitions
-            if ($node instanceof ClassMethod && ($node->type & ClassNode::MODIFIER_PRIVATE)) {
+            if ($node instanceof ClassMethod && ($node->flags & ClassNode::MODIFIER_PRIVATE) && strpos($node->name, '__') !== 0) {
 
                 // Record original name and scramble it
-                $originalName = $node->name;
+                $originalName = $node->name->toString();
                 $this->scramble($node);
 
                 // Record renaming
@@ -140,5 +119,37 @@ class ScramblePrivateMethod extends ScramblerVisitor
                 $this->scanMethodDefinitions($node->stmts);
             }
         }
+    }
+
+    /**
+     * Check all variable nodes
+     *
+     * @param Node $node
+     * @return Node
+     **/
+    public function enterNode(Node $node): ?Node
+    {
+        if ($this->shouldSkip()) {
+            return null;
+        }
+
+        if ($node instanceof ClassNode) {
+            $this->currentClassNode = $node;
+        }
+
+        // Scramble calls
+        if (($node instanceof MethodCall && $node->var instanceof Variable && $node->var->name === 'this') ||
+            ($node instanceof StaticCall && $node->class instanceof Node\Name && ($node->class->toString() === 'self' ||
+                    ($this->currentClassNode && $node->class->toString() === $this->currentClassNode->name)))) {
+            // Node wasn't renamed
+            if (!$this->isRenamed($node->name)) {
+                return null;
+            }
+
+            // Scramble usage
+            return $this->scramble($node);
+        }
+
+        return null;
     }
 }

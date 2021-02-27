@@ -8,8 +8,6 @@
 
 namespace Naneau\Obfuscator\Obfuscator\Event;
 
-use Symfony\Component\EventDispatcher\Event;
-use Naneau\Obfuscator\Obfuscator\Event\File;
 
 /**
  * FileError
@@ -26,17 +24,17 @@ class FileError extends File
      * The error message from Exception
      * @var string
      **/
-    private $errorMessage;
+    private string $errorMessage;
 
     /**
      * Constructor
      *
      * @param string $file
-     * @return void
-     **/
-    public function __construct($file, $errorMessage)
+     * @param $errorMessage
+     */
+    public function __construct(string $file, string $errorMessage)
     {
-        parent::setFile($file);
+        parent::__construct($file);
         $this->errorMessage = $errorMessage;
     }
 
@@ -45,7 +43,7 @@ class FileError extends File
      *
      * @return string
      */
-    public function getErrorMessage()
+    public function getErrorMessage(): string
     {
         return $this->errorMessage;
     }

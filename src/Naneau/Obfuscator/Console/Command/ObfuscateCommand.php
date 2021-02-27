@@ -8,12 +8,14 @@
 
 namespace Naneau\Obfuscator\Console\Command;
 
+use Exception;
 use Naneau\Obfuscator\Container;
 
 use Naneau\Obfuscator\Obfuscator;
 use Naneau\Obfuscator\Obfuscator\Event\File as FileEvent;
 use Naneau\Obfuscator\Obfuscator\Event\FileError as FileErrorEvent;
 
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -33,26 +35,20 @@ use \InvalidArgumentException;
  */
 class ObfuscateCommand extends Command
 {
-    /**
-     * the obfuscator
-     *
-     * @var Obfuscator
-     */
-    private $obfuscator;
 
     /**
      * the container
      *
      * @var Container
      */
-    private $container;
+    private Container $container;
 
     /**
      * Configure the command
      *
      * @return void
-     **/
-    protected function configure()
+     */
+    protected function configure(): void
     {
         $this
             ->setName('obfuscate')
@@ -85,28 +81,30 @@ class ObfuscateCommand extends Command
                 'memory_limit',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Runtime memory when running the obsfucator. ' .
+                'Runtime memory when running the obfuscator. ' .
                 'Example: 128M ' .
                 'See http://php.net/manual/en/ini.core.php#ini.memory-limit'
             );
 
-        $this->setContainer(new Container);
+        $container = new Container();
+        $this->setContainer($container);
     }
 
     /**
      * Execute the command
      *
-     * @param  InputInterface  $input
-     * @param  OutputInterface $output
-     * @return void
-     **/
-    protected function execute(InputInterface $input, OutputInterface $output)
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     * @throws Exception
+     */
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Finalize the container
         $this->finalizeContainer($input);
 
         // Change runtime memory
-        if($memory = $input->getOption('memory_limit')) {
+        if ($memory = $input->getOption('memory_limit')) {
             ini_set("memory_limit", $memory);
         }
         // Input/output dirs
@@ -130,12 +128,12 @@ class ObfuscateCommand extends Command
 
         // Strip whitespace?
         $stripWhitespace = !$input->getOption('leave_whitespace');
-        $ignoreError = !!$input->getOption('ignore_error');
+        $ignoreError = (bool)$input->getOption('ignore_error');
 
         // Show every file
         $this->getObfuscator()->getEventDispatcher()->addListener(
             'obfuscator.file',
-            function(FileEvent $event) use ($output, $directory) {
+            function (FileEvent $event) use ($output, $directory) {
                 $output->writeln(sprintf(
                     'Obfuscating <info>%s</info>',
                     substr($event->getFile(), strlen($directory))
@@ -143,10 +141,10 @@ class ObfuscateCommand extends Command
             }
         );
         // Show error processing file
-        if($ignoreError) {
+        if ($ignoreError) {
             $this->getObfuscator()->getEventDispatcher()->addListener(
                 'obfuscator.file.error',
-                function(FileErrorEvent $event) use ($output, $directory) {
+                function (FileErrorEvent $event) use ($output, $directory) {
                     $output->writeln(sprintf(
                         'Error obfuscating <error>%s</error>',
                         substr($event->getFile(), strlen($directory))
@@ -161,69 +159,8 @@ class ObfuscateCommand extends Command
         // Actual obfuscation
         $this->getObfuscator()->obfuscate($directory, $stripWhitespace,
             $ignoreError);
-    }
 
-    /**
-     * Get the container
-     *
-     * @return Container
-     */
-    public function getContainer()
-    {
-        return $this->container;
-    }
-
-    /**
-     * Set the container
-     *
-     * @param Container $container
-     * @return ObfuscateCommand
-     */
-    public function setContainer(Container $container)
-    {
-        $this->container = $container;
-
-        return $this;
-    }
-
-    /**
-     * Get the obfuscator
-     *
-     * @return Obfuscator
-     */
-    public function getObfuscator()
-    {
-        return $this->getContainer()->getContainer()->get('obfuscator');
-    }
-
-    /**
-     * Copy a directory
-     *
-     * @param string $from
-     * @param string $to
-     * @return ObfuscateCommand
-     **/
-    private function copyDir($from, $to)
-    {
-        // FIXME implement native copy
-        $output = array();
-        $return = 0;
-
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // WINDOWS
-            $command = sprintf('XCOPY "%s" "%s" /hievry', $from, $to);
-        } else {
-            // *NIX
-            $command = sprintf('cp -rf %s %s', $from, $to);
-        }        
-
-        exec($command, $output, $return);
-
-        if ($return !== 0)  {
-            throw new \Exception('Could not copy directory');
-        }
-
-        return $this;
+        return Command::SUCCESS;
     }
 
     /**
@@ -231,9 +168,11 @@ class ObfuscateCommand extends Command
      *
      * loads any given config file and compiles the container
      *
+     * @param InputInterface $input
      * @return ObfuscateCommand
-     **/
-    private function finalizeContainer(InputInterface $input)
+     * @throws Exception|InvalidArgumentException
+     */
+    private function finalizeContainer(InputInterface $input): ObfuscateCommand
     {
         // Load config if given
         $config = $input->getOption('config');
@@ -250,5 +189,71 @@ class ObfuscateCommand extends Command
         $this->getContainer()->getContainer()->compile();
 
         return $this;
+    }
+
+    /**
+     * Get the container
+     *
+     * @return Container
+     */
+    public function getContainer(): Container
+    {
+        return $this->container;
+    }
+
+    /**
+     * Set the container
+     *
+     * @param Container $container
+     * @return ObfuscateCommand
+     */
+    public function setContainer(Container $container): ObfuscateCommand
+    {
+        $this->container = $container;
+
+        return $this;
+    }
+
+    /**
+     * Copy a directory
+     *
+     * @param string $from
+     * @param string $to
+     * @return ObfuscateCommand
+     *
+     * @throws Exception
+     */
+    private function copyDir(string $from, string $to): ObfuscateCommand
+    {
+        // FIXME implement native copy
+        $output = [];
+        $return = 0;
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            // WINDOWS
+            $command = sprintf('XCOPY "%s" "%s" /hievry', $from, $to);
+        } else {
+            // *NIX
+            $command = sprintf('rsync -a --delete --exclude ".git" %s %s', $from, $to);
+        }
+
+        exec($command, $output, $return);
+
+        if ($return !== 0) {
+            throw new RuntimeException('Could not copy directory');
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get the obfuscator
+     *
+     * @return Obfuscator
+     * @throws Exception
+     */
+    public function getObfuscator(): object
+    {
+        return $this->getContainer()->getContainer()->get('obfuscator');
     }
 }

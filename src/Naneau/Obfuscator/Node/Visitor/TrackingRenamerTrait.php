@@ -8,6 +8,10 @@
 
 namespace Naneau\Obfuscator\Node\Visitor;
 
+use InvalidArgumentException;
+use PhpParser\Node;
+use PhpParser\Node\Identifier;
+
 /**
  * SkipTrait
  *
@@ -24,16 +28,16 @@ trait TrackingRenamerTrait
      *
      * @var string[]
      **/
-    private $renamed = array();
+    private array $renamed = [];
 
     /**
      * Record renaming of method
      *
-     * @param  string    $method
-     * @param  string    $newName
-     * @return SkipTrait
-     **/
-    protected function renamed($method, $newName)
+     * @param string $method
+     * @param string $newName
+     * @return self
+     */
+    protected function renamed(string $method, string $newName): self
     {
         $this->renamed[$method] = $newName;
 
@@ -41,32 +45,12 @@ trait TrackingRenamerTrait
     }
 
     /**
-     * Has a method been renamed?
-     *
-     * @param  string $method
-     * @return bool
-     **/
-    protected function isRenamed($method)
-    {
-        if (empty($method)) {
-            return false;
-        }
-
-        // Ignore variable functions
-        if (!is_string($method)) {
-            return false;
-        }
-
-        return isset($this->renamed[$method]);
-    }
-
-    /**
      * Get new name of a method
      *
-     * @param  string $method
+     * @param string $method
      * @return string
-     **/
-    protected function getNewName($method)
+     */
+    protected function getNewName(string $method): string
     {
         if (!$this->isRenamed($method)) {
             throw new InvalidArgumentException(sprintf(
@@ -79,13 +63,33 @@ trait TrackingRenamerTrait
     }
 
     /**
+     * Has a method been renamed?
+     *
+     * @param string|Node $method
+     * @return bool
+     */
+    protected function isRenamed($method): bool
+    {
+        if (empty($method)) {
+            return false;
+        }
+
+        // Ignore variable functions
+        if (!is_string($method) && !($method instanceof Identifier)) {
+            return false;
+        }
+
+        return isset($this->renamed[(string)$method]);
+    }
+
+    /**
      * Reset renamed list
      *
-     * @return SkipTrait
+     * @return self
      **/
-    protected function resetRenamed()
+    protected function resetRenamed(): self
     {
-        $this->renamed = array();
+        $this->renamed = [];
 
         return $this;
     }

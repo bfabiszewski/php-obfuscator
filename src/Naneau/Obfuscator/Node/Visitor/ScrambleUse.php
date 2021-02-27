@@ -9,21 +9,16 @@
 
 namespace Naneau\Obfuscator\Node\Visitor;
 
-use Naneau\Obfuscator\Node\Visitor\TrackingRenamerTrait;
-use Naneau\Obfuscator\Node\Visitor\SkipTrait;
-
 use Naneau\Obfuscator\Node\Visitor\Scrambler as ScramblerVisitor;
 
 use PhpParser\Node;
 
 use PhpParser\Node\Name;
-use PhpParser\Node\Name\FullyQualified;
 
 use PhpParser\Node\Param;
 
 use PhpParser\Node\Stmt\Class_ as ClassStatement;
 use PhpParser\Node\Stmt\Use_ as UseStatement;
-use PhpParser\Node\Stmt\UseUse as UseUseStatement;
 use PhpParser\Node\Stmt\StaticVar;
 
 use PhpParser\Node\Expr\ClassConstFetch;
@@ -31,8 +26,6 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\StaticPropertyFetch;
 use PhpParser\Node\Expr\New_ as NewExpression;
 use PhpParser\Node\Expr\Instanceof_ as InstanceOfExpression;
-
-use PhpParser\Node\Expr\Variable;
 
 /**
  * ScrambleUse
@@ -49,17 +42,17 @@ class ScrambleUse extends ScramblerVisitor
     /**
      * Active class
      *
-     * @var ClassStatement|bool
+     * @var ClassStatement|null
      **/
-    private $classNode;
+    private ?ClassStatement $classNode;
 
     /**
      * Before node traversal
      *
-     * @param  Node[] $nodes
-     * @return array
+     * @param Node[] $nodes
+     * @return Node[]
      **/
-    public function beforeTraverse(array $nodes)
+    public function beforeTraverse(array $nodes): array
     {
         // Reset renamed list
         $this->resetRenamed();
@@ -74,171 +67,42 @@ class ScrambleUse extends ScramblerVisitor
     }
 
     /**
-     * Check all variable nodes
+     * Find (the first) class node in a set of nodes
      *
-     * @param  Node $node
-     * @return void
+     * @param array $nodes
+     * @return ClassStatement|null returns falls if no class can be found
      **/
-    public function enterNode(Node $node)
+    private function findClass(array $nodes): ?ClassStatement
     {
-        // Class statements
-        if ($node instanceof ClassStatement) {
-            // Classes that extend another class
-            if ($node->extends !== null) {
-                $extends = $node->extends->toString();
-                if ($this->isRenamed($extends)) {
-                    $node->extends = new Name($this->getNewName($extends));
-                } elseif ($this->isRenamed($node->extends->getFirst())) {
-                    reset($node->extends->parts);
-                    $node->extends->parts[key($node->extends->parts)] = $this->getNewName($node->extends->getFirst());
-                }
+        foreach ($nodes as $node) {
+            if ($node instanceof ClassStatement) {
+                return $node;
             }
 
-            // Classes that implement an interface
-            if ($node->implements !== null && count($node->implements) > 0) {
+            if (isset($node->stmts) && is_array($node->stmts)) {
+                $class = $this->findClass($node->stmts);
 
-                $implements = [];
-
-                foreach($node->implements as $implementsName) {
-
-                    // Old name (as string)
-                    $oldName = $implementsName->toString();
-
-                    if ($this->isRenamed($oldName)) {
-                        // If renamed, set new one
-                        $implements[] = new Name($this->getNewName($oldName));
-                    } elseif ($this->isRenamed($implementsName->getFirst())) {
-                        reset($implementsName->parts);
-                        $implementsName->parts[key($implementsName->parts)] = $this->getNewName($implementsName->getFirst());
-                        $implements[] = $implementsName;
-                    } else {
-                        // If not renamed, pass old one
-                        $implements[] = $implementsName;
-                    }
-                }
-
-                $node->implements = $implements;
-            }
-
-            return $node;
-        }
-
-        if ($node instanceof Node\Stmt\ClassMethod || $node instanceof Node\Expr\Closure) {
-
-            if ($node->returnType instanceof Name) {
-                // Name
-                $name = $node->returnType->toString();
-
-                // Has it been renamed?
-                if ($this->isRenamed($name)) {
-                    $node->returnType = $this->getNewName($name);
-                    return $node;
-                } elseif ($this->isRenamed($node->returnType->getFirst())) {
-                    reset($node->returnType->parts);
-                    $node->returnType->parts[key($node->returnType->parts)] = $this->getNewName($node->returnType->getFirst());
-                    return $node;
-                }
-            }
-
-            if ($node->returnType instanceof Node\NullableType && $node->returnType->type instanceof Name) {
-                // Name
-                $name = $node->returnType->type->toString();
-
-                // Has it been renamed?
-                if ($this->isRenamed($name)) {
-                    $node->returnType->type = $this->getNewName($name);
-                    return $node;
-                } elseif ($this->isRenamed($node->returnType->type->getFirst())) {
-                    reset($node->returnType->type->parts);
-                    $node->returnType->type->parts[key($node->returnType->type->parts)] = $this->getNewName($node->returnType->type->getFirst());
-                    return $node;
+                if ($class instanceof ClassStatement) {
+                    return $class;
                 }
             }
         }
 
-        if ($node instanceof Param && $node->type instanceof Node\NullableType && $node->type->type instanceof Name) {
-            // Name
-            $name = $node->type->type->toString();
-
-            // Has it been renamed?
-            if ($this->isRenamed($name)) {
-                $node->type->type = $this->getNewName($name);
-                return $node;
-            } elseif ($this->isRenamed($node->type->type->getFirst())) {
-                reset($node->type->type->parts);
-                $node->type->type->parts[key($node->type->type->parts)] = $this->getNewName($node->type->type->getFirst());
-                return $node;
-            }
-        }
-
-        // Param rename
-        if ($node instanceof Param && $node->type instanceof Name) {
-            // Name
-            $name = $node->type->toString();
-
-            // Has it been renamed?
-            if ($this->isRenamed($name)) {
-                $node->type = $this->getNewName($name);
-                return $node;
-            } elseif ($this->isRenamed($node->type->getFirst())) {
-                reset($node->type->parts);
-                $node->type->parts[key($node->type->parts)] = $this->getNewName($node->type->getFirst());
-                return $node;
-            }
-        }
-
-        // Static call or constant lookup on class
-        if (
-            $node instanceof ClassConstFetch
-            || $node instanceof StaticCall
-            || $node instanceof StaticPropertyFetch
-            || $node instanceof StaticVar
-            || $node instanceof NewExpression
-            || $node instanceof InstanceOfExpression
-        ) {
-            // We need to be in a class for this to work
-            if (empty($this->classNode)) {
-                return;
-            }
-
-            // We need a name
-            if (!($node->class instanceof Name)) {
-                return;
-            }
-
-            // Class name
-            $name = $node->class->toString();
-
-            if ($name === $this->classNode->name) {
-                return;
-            }
-
-            // Has it been renamed?
-            if ($this->isRenamed($name)) {
-                $node->class = new Name($this->getNewName($name));
-                return $node;
-            } else {
-                if ($this->isRenamed($node->class->getFirst())) {
-                    reset($node->class->parts);
-                    $node->class->parts[key($node->class->parts)] = $this->getNewName($node->class->getFirst());
-                    return $node;
-                }
-            }
-        }
+        return null;
     }
 
     /**
      * Scramble at use statements
      *
-     * @param  Node[] $nodes
+     * @param Node[] $nodes
      * @return void
      **/
-    private function scanUse(array $nodes)
+    private function scanUse(array $nodes): void
     {
         foreach ($nodes as $node) {
             // Scramble the private method definitions
             if ($node instanceof UseStatement) {
-                foreach($node->uses as $useNode) {
+                foreach ($node->uses as $useNode) {
 
                     // Record original name and scramble it
                     $originalName = $useNode->name->toString();
@@ -283,27 +147,165 @@ class ScrambleUse extends ScramblerVisitor
     }
 
     /**
-     * Find (the first) class node in a set of nodes
+     * Check all variable nodes
      *
-     * @param array $nodes
-     * @return ClassStatement|bool returns falls if no class can be found
+     * @param Node $node
+     * @return Node|null
      **/
-    private function findClass(array $nodes)
+    public function enterNode(Node $node): ?Node
     {
-        foreach($nodes as $node) {
-            if ($node instanceof ClassStatement) {
-                return $node;
+        // Class statements
+        if ($node instanceof ClassStatement) {
+            // Classes that extend another class
+            if ($node->extends !== null) {
+                $extends = $node->extends->toString();
+                if ($this->isRenamed($extends)) {
+                    $node->extends = new Name($this->getNewName($extends));
+                } elseif ($this->isRenamed($node->extends->getFirst())) {
+                    reset($node->extends->parts);
+                    $node->extends->parts[key($node->extends->parts)] = $this->getNewName($node->extends->getFirst());
+                }
             }
 
-            if (isset($node->stmts) && is_array($node->stmts)) {
-                $class = $this->findClass($node->stmts);
+            // Classes that implement an interface
+            if ($node->implements !== null && count($node->implements) > 0) {
 
-                if ($class instanceof ClassStatement) {
-                    return $class;
+                $implements = [];
+
+                foreach ($node->implements as $implementsName) {
+
+                    // Old name (as string)
+                    $oldName = $implementsName->toString();
+
+                    if ($this->isRenamed($oldName)) {
+                        // If renamed, set new one
+                        $implements[] = new Name($this->getNewName($oldName));
+                    } elseif ($this->isRenamed($implementsName->getFirst())) {
+                        reset($implementsName->parts);
+                        $implementsName->parts[key($implementsName->parts)] = $this->getNewName($implementsName->getFirst());
+                        $implements[] = $implementsName;
+                    } else {
+                        // If not renamed, pass old one
+                        $implements[] = $implementsName;
+                    }
+                }
+
+                $node->implements = $implements;
+            }
+
+            return $node;
+        }
+
+        if ($node instanceof Node\Stmt\ClassMethod || $node instanceof Node\Expr\Closure) {
+
+            if ($node->returnType instanceof Name) {
+                // Name
+                $name = $node->returnType->toString();
+
+                // Has it been renamed?
+                if ($this->isRenamed($name)) {
+                    $node->returnType = $this->getNewName($name);
+                    return $node;
+                }
+
+                if ($this->isRenamed($node->returnType->getFirst())) {
+                    reset($node->returnType->parts);
+                    $node->returnType->parts[key($node->returnType->parts)] = $this->getNewName($node->returnType->getFirst());
+                    return $node;
+                }
+            }
+
+            if ($node->returnType instanceof Node\NullableType && $node->returnType->type instanceof Name) {
+                // Name
+                $name = $node->returnType->type->toString();
+
+                // Has it been renamed?
+                if ($this->isRenamed($name)) {
+                    $node->returnType->type = $this->getNewName($name);
+                    return $node;
+                }
+
+                if ($this->isRenamed($node->returnType->type->getFirst())) {
+                    reset($node->returnType->type->parts);
+                    $node->returnType->type->parts[key($node->returnType->type->parts)] = $this->getNewName($node->returnType->type->getFirst());
+                    return $node;
                 }
             }
         }
 
-        return false;
+        if ($node instanceof Param && $node->type instanceof Node\NullableType && $node->type->type instanceof Name) {
+            // Name
+            $name = $node->type->type->toString();
+
+            // Has it been renamed?
+            if ($this->isRenamed($name)) {
+                $node->type->type = $this->getNewName($name);
+                return $node;
+            }
+
+            if ($this->isRenamed($node->type->type->getFirst())) {
+                reset($node->type->type->parts);
+                $node->type->type->parts[key($node->type->type->parts)] = $this->getNewName($node->type->type->getFirst());
+                return $node;
+            }
+        }
+
+        // Param rename
+        if ($node instanceof Param && $node->type instanceof Name) {
+            // Name
+            $name = $node->type->toString();
+
+            // Has it been renamed?
+            if ($this->isRenamed($name)) {
+                $node->type = $this->getNewName($name);
+                return $node;
+            }
+
+            if ($this->isRenamed($node->type->getFirst())) {
+                reset($node->type->parts);
+                $node->type->parts[key($node->type->parts)] = $this->getNewName($node->type->getFirst());
+                return $node;
+            }
+        }
+
+        // Static call or constant lookup on class
+        if (
+            $node instanceof ClassConstFetch
+            || $node instanceof StaticCall
+            || $node instanceof StaticPropertyFetch
+            || $node instanceof StaticVar
+            || $node instanceof NewExpression
+            || $node instanceof InstanceOfExpression
+        ) {
+            // We need to be in a class for this to work
+            if (empty($this->classNode)) {
+                return null;
+            }
+
+            // We need a name
+            if (!($node->class instanceof Name)) {
+                return null;
+            }
+
+            // Class name
+            $name = $node->class->toString();
+
+            if ($name === $this->classNode->name) {
+                return null;
+            }
+
+            // Has it been renamed?
+            if ($this->isRenamed($name)) {
+                $node->class = new Name($this->getNewName($name));
+                return $node;
+            }
+
+            if ($this->isRenamed($node->class->getFirst())) {
+                reset($node->class->parts);
+                $node->class->parts[key($node->class->parts)] = $this->getNewName($node->class->getFirst());
+                return $node;
+            }
+        }
+        return null;
     }
 }
